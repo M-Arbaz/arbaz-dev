@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tic Tac Toe — JS</title>
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #0b1220;
+      --accent: #06b6d4;
+      --muted: #94a3b8;
+      --win: #22c55e;
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, var(--bg), #08101a 60%);
+      color: #e6eef6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 540px;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px
+    }
+
+    p.lead {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .cell {
+      background: transparent;
+      border-radius: 8px;
+      min-height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      cursor: pointer;
+      user-select: none;
+      border: 2px solid rgba(255, 255, 255, 0.58);
+      transition: transform .08s ease, background .12s ease;
+    }
+
+    button.cell.highlight.win {
+      text-decoration: underline;
+      font-weight: bold;
+    }
+
+    .cell:hover {
+      transform: translateY(-3px)
+    }
+
+    .cell:active {
+      transform: translateY(0)
+    }
+
+    .meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 14px
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px
+    }
+
+    button {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: inherit;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button.primary {
+      background: linear-gradient(90deg, var(--accent), #0284c7);
+      border: 0
+    }
+
+    .winner {
+      color: var(--win);
+      font-weight: 700
+    }
+
+    .highlight {
+      background: linear-gradient(173deg, rgb(2 255 95 / 42%), rgb(76 175 80 / 39%));
+      border-color: rgb(34 197 94 / 79%);
+    }
+
+    .scores {
+      display: flex;
+      gap: 10px;
+      align-items: center
+    }
+
+    .score {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    @media (max-width:420px) {
+      .cell {
+        min-height: 64px;
+        font-size: 32px
+      }
+
+      .card {
+        padding: 12px
+      }
+
+      h1 {
+        font-size: 18px
+      }
+    }
+
+    /* accessible focus */
+    .cell:focus {
+      outline: 3px solid rgba(6, 182, 212, 0.12)
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card" role="application" aria-label="Tic Tac Toe game">
+    <h1>Tic Tac Toe</h1>
+    <p class="lead">Click a cell to play against CPU. You are <strong>X</strong>, CPU is <strong>O</strong>.</p>
+
+    <div id="board" class="board" aria-live="polite"></div>
+
+    <div class="meta">
+      <div class="status" id="status">Turn: <span id="turn">X</span></div>
+      <div class="scores">
+        <div class="score">X: <span id="scoreX">0</span></div>
+        <div class="score">O: <span id="scoreO">0</span></div>
+        <div class="score">Draws: <span id="scoreD">0</span></div>
+      </div>
+      <div class="controls">
+        <button id="reset">Restart</button>
+        <button id="clearScore">Clear scores</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tic Tac Toe vs CPU — fixed highlight bug
+    (function () {
+      const boardEl = document.getElementById('board');
+      const statusEl = document.getElementById('status');
+      const turnEl = document.getElementById('turn');
+      const scoreX = document.getElementById('scoreX');
+      const scoreO = document.getElementById('scoreO');
+      const scoreD = document.getElementById('scoreD');
+      const resetBtn = document.getElementById('reset');
+      const clearScoreBtn = document.getElementById('clearScore');
+
+      let board = Array(9).fill(null);
+      let current = 'X'; // Player is always X
+      let running = true;
+      let scores = { X: 0, O: 0, D: 0 };
+
+      const wins = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+      ];
+
+      function makeCell(i) {
+        const el = document.createElement('button');
+        el.className = 'cell';
+        el.type = 'button';
+        el.setAttribute('data-i', i);
+        el.setAttribute('aria-label', 'Cell ' + (i + 1));
+        el.setAttribute('aria-pressed', 'false');
+        el.addEventListener('click', onClickCell);
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+        });
+        return el;
+      }
+
+      function renderBoard() {
+        boardEl.innerHTML = '';
+        for (let i = 0; i < 9; i++) {
+          const cell = makeCell(i);
+          if (board[i]) {
+            cell.textContent = board[i];
+            cell.setAttribute('aria-pressed', 'true');
+            cell.disabled = true;
+          }
+          boardEl.appendChild(cell);
+        }
+        turnEl.textContent = current;
+      }
+
+      function onClickCell(e) {
+        if (!running || current !== 'X') return;
+        const i = Number(e.currentTarget.dataset.i);
+        if (board[i]) return;
+        board[i] = 'X';
+
+        const result = checkGame();   // returns result but does NOT render
+        renderBoard();                // render once after the move
+
+        if (result && result.type === 'win') {
+          highlight(result.combo);
+          return;                     // game over, do not let CPU move
+        }
+        if (result && result.type === 'draw') {
+          return;                     // draw — already rendered
+        }
+
+        // continue game: CPU move
+        current = 'O';
+        statusEl.textContent = 'CPU thinking...';
+        setTimeout(cpuMove, 500);
+      }
+
+      function cpuMove() {
+        if (!running) return;
+
+        const available = board.map((v, i) => v ? null : i).filter(v => v !== null);
+
+        // 1. Try to win
+        for (const i of available) {
+          board[i] = 'O';
+          if (checkWinner('O')) {
+            finalizeMove(i);
+            return;
+          }
+          board[i] = null;
+        }
+
+        // 2. Block player's winning move
+        for (const i of available) {
+          board[i] = 'X';
+          if (checkWinner('X')) {
+            board[i] = 'O';
+            finalizeMove(i);
+            return;
+          }
+          board[i] = null;
+        }
+
+        // 3. Otherwise pick center if free
+        if (available.includes(4)) {
+          finalizeMove(4);
+          return;
+        }
+
+        // 4. Otherwise random
+        const i = available[Math.floor(Math.random() * available.length)];
+        finalizeMove(i);
+      }
+
+      function finalizeMove(i) {
+        board[i] = 'O';
+
+        const result = checkGame();  // detect result but do not render here
+        renderBoard();               // render once after the CPU move
+
+        if (result && result.type === 'win') {
+          highlight(result.combo);
+          return;
+        }
+        if (result && result.type === 'draw') {
+          return;
+        }
+
+        if (running) {
+          current = 'X';
+          statusEl.textContent = 'Turn: X';
+        }
+      }
+
+      // helper: check if player has a win (used by CPU logic)
+      function checkWinner(player) {
+        return wins.some(([a, b, c]) => board[a] === player && board[b] === player && board[c] === player);
+      }
+
+      // NEW: checkGame returns result object so callers can render + highlight correctly
+      function checkGame() {
+        for (const combo of wins) {
+          const [a, b, c] = combo;
+          if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+            running = false;
+            scores[board[a]]++;
+            updateScores();
+            statusEl.innerHTML = 'Winner: <span class="winner">' + board[a] + '</span>';
+            return { type: 'win', combo, player: board[a] };
+          }
+        }
+        if (board.every(Boolean)) {
+          running = false;
+          scores.D++;
+          updateScores();
+          statusEl.textContent = 'Draw!';
+          if (statusEl.textContent === 'Draw!') {
+            const pressedArray = document.querySelectorAll('.cell[aria-pressed="true"]');
+            pressedArray.forEach(cell => { cell.classList.add('highlight', 'draw'); });
+          }
+          return { type: 'draw' };
+        }
+        return null;
+      }
+
+      function highlight(combo) {
+        // apply highlight/win class to the currently rendered cells
+        combo.forEach((i) => {
+          const cell = boardEl.querySelector('[data-i="' + i + '"]');
+          if (cell) {
+            cell.classList.add('highlight', 'win'); // add both classes
+          }
+        });
+      }
+
+      function updateScores() {
+        scoreX.textContent = scores.X;
+        scoreO.textContent = scores.O;
+        scoreD.textContent = scores.D;
+      }
+
+      function resetGame() {
+        board = Array(9).fill(null);
+        current = 'X';
+        running = true;
+        statusEl.textContent = 'Turn: ' + current;
+        turnEl.textContent = current;
+        renderBoard();
+      }
+
+      function loadScores() {
+        try {
+          const s = JSON.parse(localStorage.getItem('ttt-scores'));
+          if (s && typeof s === 'object') { scores = Object.assign(scores, s); }
+        } catch (e) { }
+        updateScores();
+      }
+      function saveScores() {
+        try { localStorage.setItem('ttt-scores', JSON.stringify(scores)); } catch (e) { }
+      }
+
+      resetBtn.addEventListener('click', () => { resetGame(); });
+      clearScoreBtn.addEventListener('click', () => {
+        scores = { X: 0, O: 0, D: 0 };
+        saveScores();
+        updateScores();
+        resetGame();
+      });
+
+      const observer = new MutationObserver(() => { if (!running) saveScores(); });
+      observer.observe(statusEl, { childList: true, subtree: true });
+
+      loadScores();
+      resetGame();
+
+    })();
+  </script>
+
+</body>
+
+</html>
