@@ -1097,7 +1097,7 @@ div#js-games{
 }
 @media screen and (min-width: 1920px){
     main.main{
-        min-height: unset;
+        min-height: 50vh;
         max-height: 65vh;
     }
 }
